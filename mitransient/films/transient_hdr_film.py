@@ -1,9 +1,40 @@
 import mitsuba as mi
 import drjit as dr
 
+import csv
+import numpy as np
 from mitsuba import is_monochromatic, is_spectral
 from mitransient.render.transient_block import TransientBlock
 
+def leer_spad():
+    times = [0.0] * 4096
+    pdf_sub20 = [0.0] * 4096
+    pdf_sub5 = [0.0] * 4096
+
+    with open('../20um_cmos.csv', 'r') as f:
+        f.readline()
+        for i in range(4096): # 4096 valid rows
+            t, vsub20, vsub5 = f.readline().split(',')
+            times[i] = mi.Float(float(t))
+            pdf_sub20[i] = mi.Float(float(vsub20))
+            pdf_sub5[i] = mi.Float(float(vsub5))
+
+    # normalize PDFs
+    total_sub20 = sum(pdf_sub20)
+    total_sub5 = sum(pdf_sub5)
+    pdf_sub20 = [x / total_sub20 for x in pdf_sub20]
+    pdf_sub5 = [x / total_sub5 for x in pdf_sub5]
+
+    # calculate CDFs
+    cdf_sub20 = [0.0] * 4096
+    cdf_sub5 = [0.0] * 4096
+    cdf_sub20[0] = pdf_sub20[0]
+    cdf_sub5[0] = pdf_sub5[0]
+    for i in range(1, 4096):
+        cdf_sub20[i] = cdf_sub20[i-1] + pdf_sub20[i]
+        cdf_sub5[i] = cdf_sub5[i-1] + pdf_sub5[i]
+
+    return cdf_sub5, cdf_sub20
 
 class TransientHDRFilm(mi.Film):
     """
@@ -46,7 +77,7 @@ class TransientHDRFilm(mi.Film):
     def end_opl(self):
         return self.start_opl + self.bin_width_opl * self.temporal_bins
 
-    def add_transient_data(self, spec, distance, wavelengths, active, pos, ray_weight):
+    def add_transient_data(self, spec, sampler ,distance, wavelengths, active, pos, ray_weight):
         """
         Add a path's contribution to the film
         * spec: Spectrum / contribution of the path
@@ -57,6 +88,25 @@ class TransientHDRFilm(mi.Film):
         * pos: pixel position
         * ray_weight: weight of the ray given by the sensor
         """
+        # Llamada a la función
+        cdf_sub5, cdf_sub20 = leer_spad()
+
+        #dr.printf_async('%f',cdf_sub5[0]) # Prueba para ver que no reventaba por la lectura
+
+        prueba = [1.0,1.0,1.0,1.0,1.0,1.0] # Prueba simple para ver si funciona
+
+        dist_sub5 = mi.DiscreteDistribution(
+            prueba
+            )
+        
+        #dist_sub20 = mi.DiscreteDistribution(cdf_sub20)
+
+        s = sampler.next_1d()
+
+        #a = mi.DiscreteDistribution(c) 
+        #jitter_index, new_sample = a.sample_reuse(s, active)
+        #dr.printf_async('%f\n',jitter_index)
+
         idd = (distance - self.start_opl) / self.bin_width_opl
         coords = mi.Vector3f(pos.x, pos.y, idd)
         mask = (idd >= 0) & (idd < self.temporal_bins)

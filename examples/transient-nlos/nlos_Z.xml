@@ -69,6 +69,8 @@
                 <!-- <boolean name="auto_detect_bins" value="false"/> -->
                 <float name="bin_width_opl" value="0.006"/>
                 <float name="start_opl" value="1.85"/>
+                <string name="spad_csv" value="../20um_cmos.csv"/>
+                <float name="mod_spad" value="10"/>
                 <rfilter type="box"/>
             </film>
         </sensor>

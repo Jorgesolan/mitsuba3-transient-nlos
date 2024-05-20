@@ -93,6 +93,7 @@ class TransientHDRFilm(mi.Film):
         * pos: pixel position
         * ray_weight: weight of the ray given by the sensor
         """
+
         if self.use_spad:
             sample2 = sampler.next_2d() # Números aleatorios
             mask_spad = sample2[1] < self.spad_lost # Spad detecta el 30% de los fotones que le llegan
@@ -100,12 +101,13 @@ class TransientHDRFilm(mi.Film):
             
             result = dr.gather(dtype=type(self.time), source=self.time, index=index)
             dist_spad = result * speed_of_light * self.mod_spad
+            dr.printf_async("dist_spad: %f\nidd: %f\n", dist_spad,idd)
         else:
-            mask_spad = True
-            dist_spad = 0.0
+            mask_spad = mi.Mask(True)
+            dist_spad = mi.Float(0.0)
 
-        idd = (distance - self.start_opl) / self.bin_width_opl
-
+        total_dist = distance + dist_spad - self.start_opl
+        idd = total_dist / self.bin_width_opl
         coords = mi.Vector3f(pos.x, pos.y, idd + dist_spad)
         mask = (idd >= 0) & (idd < self.temporal_bins) & mask_spad
         self.transient.put(
